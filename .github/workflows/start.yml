@@ -1,4 +1,4 @@
-name: Start Pod
+name: Start RunPod Pod
 
 on:
   workflow_dispatch:
@@ -7,35 +7,51 @@ jobs:
   start:
     runs-on: ubuntu-latest
     steps:
-      - name: Start pod
+      - name: Try cheap pod first
+        id: cheap
+        continue-on-error: true
         run: |
+          echo "Trying CHEAP pod..."
           RESPONSE=$(curl -sS -X POST "https://api.runpod.io/graphql" \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_POD_ID }}\\\" }) { id desiredStatus } }\"}")
+            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_CHEAP_POD_ID }}\\\" }) { id desiredStatus } }\"}")
 
           echo "$RESPONSE"
 
-          if echo "$RESPONSE" | grep -q "not enough free GPUs"; then
-            echo "Cloud pod could not start: no GPU available right now."
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "Cheap pod unavailable."
             exit 1
           fi
+
+          echo "CHEAP pod start request succeeded."
+
+      - name: Try mid pod if cheap failed
+        if: steps.cheap.outcome == 'failure'
+        run: |
+          echo "Trying MID pod..."
+          RESPONSE=$(curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_MID_POD_ID }}\\\" }) { id desiredStatus } }\"}")
+
+          echo "$RESPONSE"
 
           if echo "$RESPONSE" | grep -q '"errors"'; then
-            echo "Cloud pod could not start: RunPod returned an error."
+            echo "Both CHEAP and MID pods are unavailable."
             exit 1
           fi
 
-          echo "Cloud pod start request succeeded."
+          echo "MID pod start request succeeded."
 
       - name: Wait for services
         run: |
-          echo "Waiting 90 seconds for Open WebUI/Ollama to boot..."
+          echo "Waiting 90 seconds for services to boot..."
           sleep 90
 
-      - name: Confirm status
+      - name: Check status
         run: |
           curl -sS -X POST "https://api.runpod.io/graphql" \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"query\":\"query { pod(input: { podId: \\\"${{ secrets.RUNPOD_POD_ID }}\\\" }) { id name desiredStatus runtime { uptimeInSeconds } } }\"}"
+            -d "{\"query\":\"query { myself { pods { id name desiredStatus runtime { uptimeInSeconds ports { privatePort publicPort type } } } } }\"}"
