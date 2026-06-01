@@ -1,4 +1,4 @@
-name: Check RunPod Pod Status
+name: Check Pod Status
 
 on:
   workflow_dispatch:
