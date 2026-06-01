@@ -1,14 +1,17 @@
-name: Start Cheap Pod 
+name: Start RunPod Pod
 
 on:
   workflow_dispatch:
 
 jobs:
-  start-cheap:
+  start:
     runs-on: ubuntu-latest
     steps:
-      - name: Start cheap pod
+      - name: Try cheap pod first
+        id: cheap
+        continue-on-error: true
         run: |
+          echo "Trying CHEAP pod..."
           RESPONSE=$(curl -sS -X POST "https://api.runpod.io/graphql" \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
@@ -16,25 +19,62 @@ jobs:
 
           echo "$RESPONSE"
 
-          if echo "$RESPONSE" | grep -q "not enough free GPUs"; then
-            echo "CHEAP pod could not start: no GPU available right now."
-            exit 1
-          fi
-
           if echo "$RESPONSE" | grep -q '"errors"'; then
-            echo "CHEAP pod could not start: RunPod returned an error."
+            echo "CHEAP pod unavailable."
             exit 1
           fi
 
           echo "CHEAP pod start request succeeded."
 
+      - name: Try mid pod if cheap failed
+        id: mid
+        if: steps.cheap.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          echo "Trying MID pod..."
+          RESPONSE=$(curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_MID_POD_ID }}\\\" }) { id desiredStatus } }\"}")
+
+          echo "$RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "MID pod unavailable."
+            exit 1
+          fi
+
+          echo "MID pod start request succeeded."
+
+      - name: Try mid-plus pod if cheap and mid failed
+        if: steps.cheap.outcome == 'failure' && steps.mid.outcome == 'failure'
+        run: |
+          echo "Trying MID_PLUS pod..."
+          RESPONSE=$(curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_MID_PLUS_POD_ID }}\\\" }) { id desiredStatus } }\"}")
+
+          echo "$RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "CHEAP, MID, and MID_PLUS pods are unavailable."
+            exit 1
+          fi
+
+          echo "MID_PLUS pod start request succeeded."
+
       - name: Wait for services
         run: |
-          echo "Waiting 90 seconds for Open WebUI/Ollama to boot..."
+          echo "Waiting 90 seconds for services to boot..."
           sleep 90
 
-      - name: Check cheap pod status
+      - name: Check status
         run: |
+          curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query { myself { pods { id name desiredStatus runtime { uptimeInSeconds ports { privatePort publicPort type } } } } }\"}"        run: |
           curl -sS -X POST "https://api.runpod.io/graphql" \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
