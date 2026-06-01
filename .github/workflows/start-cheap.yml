@@ -17,7 +17,7 @@ jobs:
           echo "$RESPONSE"
 
           if echo "$RESPONSE" | grep -q "not enough free GPUs"; then
-            echo "MID pod could not start: no GPU available right now."
+            echo "CHEAP pod could not start: no GPU available right now."
             exit 1
           fi
 
