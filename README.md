@@ -1,6 +1,7 @@
 ### Start Cloud
 - [Start List](../../actions/workflows/start.yml)
-- [Start Cheap](../../actions/workflows/start.yml)
+- [Start Cheapest](../../actions/workflows/start-cheapest.yml)
+- [Start Cheap](../../actions/workflows/start-cheap.yml)
 - [Start Mid](../../actions/workflows/start-mid.yml)
 
 ### Stop Cloud
