@@ -1,4 +1,4 @@
-name: Stop RunPod Pod
+name: Stop Pod
 
 on:
   workflow_dispatch:
