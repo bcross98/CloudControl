@@ -1,4 +1,4 @@
-name: Stop Pod
+name: Stop Pods
 
 on:
   workflow_dispatch:
@@ -7,9 +7,23 @@ jobs:
   stop:
     runs-on: ubuntu-latest
     steps:
-      - name: Stop pod
+      - name: Stop cheap pod
         run: |
-          curl -X POST "https://api.runpod.io/graphql" \
+          curl -sS -X POST "https://api.runpod.io/graphql" \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"query\":\"mutation { podStop(input: { podId: \\\"${{ secrets.RUNPOD_POD_ID }}\\\" }) { id desiredStatus } }\"}"
+            -d "{\"query\":\"mutation { podStop(input: { podId: \\\"${{ secrets.RUNPOD_CHEAP_POD_ID }}\\\" }) { id desiredStatus } }\"}"
+
+      - name: Stop mid pod
+        run: |
+          curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { podStop(input: { podId: \\\"${{ secrets.RUNPOD_MID_POD_ID }}\\\" }) { id desiredStatus } }\"}"
+
+      - name: Check status
+        run: |
+          curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query { myself { pods { id name desiredStatus runtime { uptimeInSeconds } } } }\"}"
