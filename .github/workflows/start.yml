@@ -1,4 +1,4 @@
-name: Start RunPod Pod
+name: Start Pod
 
 on:
   workflow_dispatch:
@@ -9,7 +9,33 @@ jobs:
     steps:
       - name: Start pod
         run: |
-          curl -X POST "https://api.runpod.io/graphql" \
+          RESPONSE=$(curl -sS -X POST "https://api.runpod.io/graphql" \
             -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_POD_ID }}\\\" }) { id desiredStatus } }\"}"
+            -d "{\"query\":\"mutation { podResume(input: { podId: \\\"${{ secrets.RUNPOD_POD_ID }}\\\" }) { id desiredStatus } }\"}")
+
+          echo "$RESPONSE"
+
+          if echo "$RESPONSE" | grep -q "not enough free GPUs"; then
+            echo "Cloud pod could not start: no GPU available right now."
+            exit 1
+          fi
+
+          if echo "$RESPONSE" | grep -q '"errors"'; then
+            echo "Cloud pod could not start: RunPod returned an error."
+            exit 1
+          fi
+
+          echo "Cloud pod start request succeeded."
+
+      - name: Wait for services
+        run: |
+          echo "Waiting 90 seconds for Open WebUI/Ollama to boot..."
+          sleep 90
+
+      - name: Confirm status
+        run: |
+          curl -sS -X POST "https://api.runpod.io/graphql" \
+            -H "Authorization: Bearer ${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"query { pod(input: { podId: \\\"${{ secrets.RUNPOD_POD_ID }}\\\" }) { id name desiredStatus runtime { uptimeInSeconds } } }\"}"
